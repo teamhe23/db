@@ -1,0 +1,1 @@
+SELECT  * FROM EDSR.dpc_pl_carga_promo ORDER BY ID_CARGA DESC;
