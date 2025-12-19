@@ -15,11 +15,13 @@ COMMIT;
 --TEMP_TPCARPAR_SEQ
 SELECT (SEQ.LAST_NUMBER - 1) AS SEQUENCE_NOW, SEQ.LAST_NUMBER  , SEQ.* FROM ALL_SEQUENCES SEQ WHERE SEQUENCE_NAME LIKE '%TEMP_TPCARPAR_SEQ%';
 -- TOTAL Carga Masiva Dinamicos
-SELECT COUNT(1) FROM temp_CargaMasiva_ParametrosPMM;
+SELECT DISTINCT ID FROM EDSR.temp_CargaMasiva_ParametrosPMM;
+-- TOTAL Carga Masiva Dinamicos
+SELECT COUNT(1) FROM EDSR.temp_CargaMasiva_ParametrosPMM;
 -- Verificacion ID
-SELECT * FROM temp_CargaMasiva_ParametrosPMM ORDER BY ID FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM EDSR.temp_CargaMasiva_ParametrosPMM ORDER BY ID FETCH FIRST 10 ROWS ONLY;
 -- Verificacion ID desc
-SELECT * FROM temp_CargaMasiva_ParametrosPMM ORDER BY ID DESC FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM EDSR.temp_CargaMasiva_ParametrosPMM ORDER BY ID DESC FETCH FIRST 10 ROWS ONLY;
 --TEMP_TPCARSEM
 SELECT COUNT(1) FROM EDSR.TEMP_TPCARSEM;
 --TEMP_PARAMREPOSEM
@@ -28,32 +30,61 @@ SELECT COUNT(1) FROM EDSR.TEMP_PARAMREPOSEM;
 SELECT COUNT(1) FROM EDSR.TPCARPAR;
 --TPCARSEM
 SELECT COUNT(1) FROM EDSR.TPCARSEM;
+BEGIN
+	DBMS_OUTPUT.PUT_LINE('Validación de Carga Inicial');
+END;
+
+--validacion:
+SELECT RPL_SEQ, RPL_SEQ_REG, WGT_WEEK, COUNT(*) FROM EDSR.TEMP_TPCARSEM GROUP BY RPL_SEQ, RPL_SEQ_REG, WGT_WEEK HAVING COUNT(*)>1;
+
+SELECT PRD_LVL_NUMBER, COUNT(*)
+FROM EDSR.TEMP_PARAMREPOSEM
+GROUP BY PRD_LVL_NUMBER;
 
 ----------------------------------------
 --          Carga INICIAL
 ----------------------------------------
 DECLARE
-
     TOTAL NUMBER := 0;
     MINIMO NUMBER := 0;
     MAXIMO NUMBER := 0;
 
     p_secuencia NUMBER;
-
     V_PRD_LVL_NUMBER VARCHAR2(15);
     TOTAL_PARAMETROS NUMBER := 0;
     -- TOTAL_PARAMETROS_SEM NUMBER := 0;
     TOTAL_SKUS_CROSSDOCKING NUMBER := 0;
+    
     intTotSemanas NUMBER := 0;
-
     strFijo CHAR;
     intDiaRevision NUMBER(3);
     intDiaProceso NUMBER(3);
     intSemSR NUMBER(3);
     dblPorServicio NUMBER(4, 2);
     intSemVenta NUMBER(7);
+    
+    --validacion de carga en TPCARSEM
+    
+    CURSOR cur_conflict IS
+        SELECT t.RPL_SEQ,
+               t.RPL_SEQ_REG,
+               t.WGT_WEEK
+        FROM EDSR.TEMP_TPCARSEM t
+        WHERE EXISTS (
+            SELECT 1
+            FROM EDSR.TPCARSEM c
+            WHERE NVL(c.RPL_SEQ, -999999)       = NVL(t.RPL_SEQ, -999999)
+              AND NVL(c.RPL_SEQ_REG, -999999)   = NVL(t.RPL_SEQ_REG, -999999)
+              AND NVL(c.WGT_WEEK, -999999)      = NVL(t.WGT_WEEK, -999999)
+        )
+        ORDER BY t.RPL_SEQ, t.RPL_SEQ_REG, t.WGT_WEEK;
 
+    v_count NUMBER := 0;
 BEGIN
+	
+	DBMS_OUTPUT.PUT_LINE('----------------------------------------');
+	DBMS_OUTPUT.PUT_LINE('------------ Carga INICIAL -------------');
+	DBMS_OUTPUT.PUT_LINE('----------------------------------------');
     SELECT COUNT(*)
      INTO TOTAL
     FROM EDSR.temp_CargaMasiva_ParametrosPMM;
@@ -74,6 +105,8 @@ BEGIN
        DBMS_OUTPUT.PUT_LINE('MAXIMO: ' || MAXIMO);
        DBMS_OUTPUT.PUT_LINE('Secuencia: ' || p_secuencia);
 
+       
+       DBMS_OUTPUT.PUT_LINE('>>>>>>>>> INICIO BUCLE <<<<<<<<<');
        WHILE MINIMO <= MAXIMO LOOP
             SELECT E_PRODUCTO
             INTO V_PRD_LVL_NUMBER
@@ -89,7 +122,7 @@ BEGIN
                 AND REP.COD_DPTO = PRD.COD_DPTO
                 AND REP.COD_LIN = PRD.COD_LIN
                 AND PRD.PRD_LVL_NUMBER = V_PRD_LVL_NUMBER;
-
+            
             IF TOTAL_PARAMETROS > 0 THEN
                 SELECT REP.RPL_FIJO, REP.RPL_REVIEW_DAYS, REP.RPL_PROC_DAYS, REP.RPL_SS, REP.PMH_SERV_LVL, REP.PRF_WGT_WEEKS
                 INTO strFijo,  intDiaRevision,  intDiaProceso,  intSemSR,  dblPorServicio,  intSemVenta
@@ -129,6 +162,7 @@ BEGIN
 
                     intTotSemanas := intSemVenta;
 
+                    EXECUTE IMMEDIATE 'DELETE EDSR.TEMP_PARAMREPOSEM';
                     INSERT INTO EDSR.TEMP_PARAMREPOSEM(WGT_WEEK, WGT_FACTOR, PRD_LVL_NUMBER)
                     SELECT
                            SEM.WGT_WEEK,
@@ -163,6 +197,8 @@ BEGIN
                 INTO intTotSemanas
                 FROM EDSR.temp_CargaMasiva_ParametrosPMM WHERE ID = MINIMO;
 
+            	--DBMS_OUTPUT.PUT_LINE('intTotSemanas: ' || intTotSemanas);
+            	--DBMS_OUTPUT.PUT_LINE('UPDATE EDSR.temp_CargaMasiva_ParametrosPMM');
                 UPDATE EDSR.temp_CargaMasiva_ParametrosPMM
                 SET
                     RPL_SEQ = p_secuencia,
@@ -188,6 +224,8 @@ BEGIN
                 -- SELECT * FROM EDSR.TEMP_PARAMREPOSEM;
                 -- TRUNCATE TABLE EDSR.TEMP_PARAMREPOSEM;
 
+            	--DBMS_OUTPUT.PUT_LINE('INSERT INTO EDSR.TEMP_PARAMREPOSEM');
+            	EXECUTE IMMEDIATE 'DELETE EDSR.TEMP_PARAMREPOSEM';
                 INSERT INTO EDSR.TEMP_PARAMREPOSEM TEMP (WGT_WEEK, PRD_LVL_NUMBER , WGT_FACTOR)
                 SELECT ROWNUM, V_PRD_LVL_NUMBER ,WGT_FACTOR
                     FROM ( SELECT ID,E_SEM1, E_SEM2, E_SEM3, E_SEM4, E_SEM5, E_SEM6, E_SEM7, E_SEM8, E_SEM9, E_SEM10 FROM EDSR.temp_CargaMasiva_ParametrosPMM WHERE ID = MINIMO
@@ -195,7 +233,9 @@ BEGIN
                 UNPIVOT(
                      WGT_FACTOR FOR SEMANA IN (E_SEM1, E_SEM2, E_SEM3, E_SEM4, E_SEM5, E_SEM6, E_SEM7, E_SEM8, E_SEM9, E_SEM10)
                     );
-
+                
+                
+				--DBMS_OUTPUT.PUT_LINE('INSERT INTO EDSR.TEMP_TPCARSEM');
                 INSERT INTO EDSR.TEMP_TPCARSEM(RPL_SEQ, RPL_SEQ_REG, WGT_WEEK, WGT_FACTOR, USR_CRE, FEC_CRE)
                 SELECT
                    p_secuencia,
@@ -215,7 +255,11 @@ BEGIN
             --DBMS_OUTPUT.PUT_LINE(V_PRD_LVL_NUMBER || ' => ' || TOTAL_PARAMETROS);
             COMMIT;
         END LOOP;
+       DBMS_OUTPUT.PUT_LINE('>>>>>>>>> FIN BUCLE <<<<<<<<<');
+       DBMS_OUTPUT.PUT_LINE('ULTIMO SKU PROCESADO: ' || V_PRD_LVL_NUMBER);
+       DBMS_OUTPUT.PUT_LINE('PROCESADO: ' || TO_CHAR(MINIMO-1) );
 
+       DBMS_OUTPUT.PUT_LINE('------> INSERT INTO EDSR.TPCARPAR');
        INSERT INTO EDSR.TPCARPAR
           (
            RPL_SEQ,
@@ -256,6 +300,25 @@ BEGIN
         --WHERE ID <=50 --OPCIONAL
         ;
 
+    DBMS_OUTPUT.PUT_LINE('=== Registros que violarían la PK (XPKTPCARSEM) ===');
+    FOR rec IN cur_conflict LOOP
+        v_count := v_count + 1;
+        DBMS_OUTPUT.PUT_LINE(
+            'RPL_SEQ=' || rec.RPL_SEQ ||
+            ', RPL_SEQ_REG=' || rec.RPL_SEQ_REG ||
+            ', WGT_WEEK=' || rec.WGT_WEEK
+        );
+    END LOOP;
+
+    IF v_count = 0 THEN
+      --  DBMS_OUTPUT.PUT_LINE('⚠️ Ningún conflicto detectado, pero Oracle sigue lanzando ORA-00001.');
+        DBMS_OUTPUT.PUT_LINE('Verifica si existen duplicados en la tabla destino con esta consulta:');
+       -- DBMS_OUTPUT.PUT_LINE('SELECT RPL_SEQ, RPL_SEQ_REG, WGT_WEEK, COUNT(*) FROM EDSR.TPCARSEM GROUP BY RPL_SEQ, RPL_SEQ_REG, WGT_WEEK HAVING COUNT(*)>1;');
+    ELSE
+        DBMS_OUTPUT.PUT_LINE('Total de conflictos reales detectados: ' || v_count);
+    END IF;
+       
+       DBMS_OUTPUT.PUT_LINE('------> INSERT INTO EDSR.TPCARSEM');
        INSERT INTO TPCARSEM
        (
         RPL_SEQ,
@@ -269,6 +332,7 @@ BEGIN
        FROM EDSR.TEMP_TPCARSEM;
 
        COMMIT;
+       DBMS_OUTPUT.PUT_LINE('Busca los productos que no tienen habilitado el cross-docking y los borra');
        -- Busca los productos que no tienen habilitado el cross-docking y los borra
         INSERT INTO TPCARPAR_REC_TMP
           (RPL_SEQ, RPL_SEQ_REG, PRD_LVL_CHILD, ORG_LVL_CHILD)
@@ -306,6 +370,7 @@ BEGIN
                    WHERE NOT NVL(PC2.ID, PC3.ID) IS NULL
                      AND SC.ORG_LVL_CHILD IS NULL);
 
+       DBMS_OUTPUT.PUT_LINE('------> DELETE FROM TPCARPAR');
         DELETE FROM TPCARPAR
         WHERE (RPL_SEQ, RPL_SEQ_REG) IN
                 (SELECT RPL_SEQ, RPL_SEQ_REG
@@ -328,6 +393,7 @@ BEGIN
        INNER JOIN ORGMSTEE O
           ON R.ORG_LVL_CHILD = O.ORG_LVL_CHILD
        WHERE RPL_SEQ = p_secuencia;
+       DBMS_OUTPUT.PUT_LINE('TOTAL_SKUS_CROSSDOCKING: ' || TOTAL_SKUS_CROSSDOCKING);
 
         IF TOTAL_SKUS_CROSSDOCKING > 0 THEN
             DBMS_OUTPUT.PUT_LINE('Se encontraron ' || TOTAL_SKUS_CROSSDOCKING || ' SKUs no válidos por el Cross-docking');
@@ -346,30 +412,35 @@ BEGIN
         END IF;
 
         COMMIT;
+        DBMS_OUTPUT.PUT_LINE('**** FIN DE CARGA ****');
+        DBMS_OUTPUT.PUT_LINE('----> Secuencia: ' || p_secuencia);
     ELSE
         DBMS_OUTPUT.PUT_LINE('No se encontraron registros');
     END if;
-
+EXCEPTION
+	WHEN OTHERS THEN
+		DBMS_OUTPUT.PUT_LINE('HORROR: ' || SQLERRM);
+		DBMS_OUTPUT.PUT_LINE('ULTIMO SKU PROCESADO: ' || V_PRD_LVL_NUMBER);
 END;
 
 -------------------------------------------------
 --          Validación de Carga INICIAL
 -------------------------------------------------
 --temp_CargaMasiva_ParametrosPMM
-SELECT COUNT(1) FROM EDSR.temp_CargaMasiva_ParametrosPMM;
+SELECT COUNT(1) temp_CargaMasiva_ParametrosPMM FROM EDSR.temp_CargaMasiva_ParametrosPMM;
 --TEMP_TPCARSEM
-SELECT COUNT(1) FROM EDSR.TEMP_TPCARSEM;
+SELECT COUNT(1) TEMP_TPCARSEM FROM EDSR.TEMP_TPCARSEM;
 --TEMP_PARAMREPOSEM
-SELECT COUNT(1) FROM EDSR.TEMP_PARAMREPOSEM;
+SELECT COUNT(1) TEMP_PARAMREPOSEM  FROM EDSR.TEMP_PARAMREPOSEM;
 --TPCARPAR
-SELECT COUNT(1) FROM EDSR.TPCARPAR;
+SELECT COUNT(1) TPCARPAR FROM EDSR.TPCARPAR;
 --TPCARSEM
-SELECT COUNT(1) FROM EDSR.TPCARSEM;
+SELECT COUNT(1) TPCARSEM FROM EDSR.TPCARSEM;
 ------------------------------------------------------------
 ------------ Validación mas minuciosa ------------
 ------------------------------------------------------------
-SELECT COUNT(*) FROM EDSR.temp_CargaMasiva_ParametrosPMM WHERE E_SEM1 = 1;
-SELECT COUNT(*) FROM EDSR.temp_CargaMasiva_ParametrosPMM WHERE E_SEM8 = 1;
+SELECT COUNT(*) E_SEM1 FROM EDSR.temp_CargaMasiva_ParametrosPMM WHERE E_SEM1 = 1;
+SELECT COUNT(*) E_SEM8 FROM EDSR.temp_CargaMasiva_ParametrosPMM WHERE E_SEM8 = 1;
 SELECT * FROM EDSR.temp_CargaMasiva_ParametrosPMM ORDER BY ID;
 SELECT * FROM EDSR.temp_CargaMasiva_ParametrosPMM ORDER BY ID DESC;
 SELECT * FROM EDSR.TEMP_TPCARSEM;
@@ -378,9 +449,16 @@ SELECT * FROM EDSR.TPPARREP;
 SELECT * FROM EDSR.TPCARPAR;
 SELECT * FROM EDSR.TPCARSEM;
 SELECT * FROM EDSR.TPCARPAR_REC_TMP;
+
+SELECT count(*) FROM EDSR.TEMP_TPCARSEM;
+SELECT count(*) FROM EDSR.TEMP_PARAMREPOSEM;
+SELECT count(*) FROM EDSR.TPPARREP;
+SELECT count(*) FROM EDSR.TPCARPAR;
+SELECT count(*) FROM EDSR.TPCARSEM;
+
 SELECT DISTINCT RPL_SEQ FROM EDSR.TPCARPAR;
 SELECT DISTINCT RPL_SEQ FROM EDSR.TPCARSEM;
-
+SELECT RPL_SEQ, RPL_SEQ_REG, WGT_WEEK, COUNT(*) FROM EDSR.TPCARSEM GROUP BY RPL_SEQ, RPL_SEQ_REG, WGT_WEEK HAVING COUNT(*)>1;
 /*
  *********************************
  HISTORICO DE CARGA
@@ -416,15 +494,42 @@ SELECT DISTINCT RPL_SEQ FROM EDSR.TPCARSEM;
  Secuencia 467 (14147 RAT 5ta Semana)  17/01/2024 18:31
  Secuencia 486 (14177 RAT 7ta Semana)  24/01/2024 18:31
  Secuencia 500 (13649 RAT 7ta Semana)  01/02/2024 13:12 (102)
+ Secuencia 552 (704 RAT 8ta Semana)  11/03/2024 08:37
+ Secuencia 580 (4507 OCS 8 Semanas)  15/04/2024 22:49
+ Secuencia 582 (4507 OCS-RAT 8 Semanas)  16/04/2024 13:07
+ Secuencia 590 (4505 OCS-RAT 8 Semanas)  17/04/2024 10:02
+
+ --PRUEBAS--
+ Secuencia 584 (1 AAA-BBB 8 Semanas)  17/04/2024 XX:XX
+ Secuencia 588 (1 AAA-BBB 8 Semanas)  17/04/2024 XX:XX
+ ---/PRUEBAS----
+  Secuencia 624 (5006 RAT 8 Semanas)  04/06/2025 XX:XX
+  Secuencia 778 (4505 OCS 1 Semanas)  31/10/2025 15:25
+  Secuencia 806 (13984 OCS 3 Semanas)  14/11/2025 11:39
+  Secuencia 808 (13984 OCS 4 Semanas)  21/11/2025 21:15
+  Secuencia 819 (15377 OCS 5 Semanas)  28/11/2025 19:51
+  Secuencia 827 (6895 OCS 8 Semanas)  02/12/2025 18:50
+  Secuencia 828 (6895 OCS 8 Semanas)  03/12/2025 15:14
+  Secuencia 831 (5281 OCS 8 Semanas)  04/12/2025 10:56
+  Secuencia 834 (5077 OCS 6 Semanas)  04/12/2025 18:54
+  Secuencia 835 (13654 OCS 8 Semanas)  04/12/2025 18:54
+  Secuencia 836 (7038 OCS 5 Semanas)  04/12/2025 18:54
+  Secuencia 843 (7038 OCS 5 Semanas)  15/12/2025 10:15
+  Secuencia 844 (13654 OCS 8 Semanas)  15/12/2025 10:35
+  
+  Secuencia 847 (18808 OCS 8 Semanas)  15/12/2025 22:21
+  Secuencia 848 (9795 OCS 57 Semanas)  15/12/2025 22:40
 */
 
 -------------------------------------------------
 --          Carga FINAL
 -------------------------------------------------
 BEGIN
-    EDSR.TP_PKG_REPDIN.SP_CARGA_PARAM_REPO(500,'SISTEMAS');
+    EDSR.TP_PKG_REPDIN.SP_CARGA_PARAM_REPO(848,'SISTEMAS');
     COMMIT;
-    DBMS_OUTPUT.PUT_LINE('Carga Exitosa');
+	DBMS_OUTPUT.PUT_LINE('----------------------------');
+    DBMS_OUTPUT.PUT_LINE('Carga Final Exitosa');
+	DBMS_OUTPUT.PUT_LINE('----------------------------');
 EXCEPTION
     WHEN OTHERS THEN
         ROLLBACK;
@@ -434,6 +539,88 @@ END;
 -------------------------------------------------
 --          Carga FINAL
 -------------------------------------------------
+
+-------------------------------------------------
+--          VALIDACIÓN FINAL
+-------------------------------------------------
+
+SELECT COUNT(1) FROM EDSR.temp_CargaMasiva_ParametrosPMM;
+--7038 solo cumplen 7013
+
+WITH U AS (
+    SELECT e.org_lvl_number   AS sucursal,
+           e.prd_lvl_number   AS sku,
+           h.prf_wgt_weeks    AS semanas,
+           e.rpl_min_stk      AS min,
+           e.rpl_max_stk      AS max
+    FROM   EPMM.rplpmhee e,
+           EDSR.tpprdmst f,
+           EPMM.whsprdee g,
+           (SELECT DISTINCT f.pmh_tech_key, f.prf_wgt_weeks
+              FROM EPMM.RPLWGTEE f) h,
+           EPMM.rplmthcd s,
+           EPMM.rpldmtcd d,
+           EPMM.RPLPFHEE pe
+    WHERE  (SELECT x.caldat FROM EPMM.caldayee x)
+              BETWEEN e.rpl_begdate AND e.rpl_enddate
+      AND  e.prd_lvl_child     = f.prd_lvl_child
+      AND  e.prd_lvl_child     = g.prd_lvl_child
+      AND  g.org_lvl_child IN (
+               SELECT TO_NUMBER(TRIM(param_value))
+               FROM   EPMM.chlparam
+               WHERE  param_code IN ('CENTRODIS')
+           )
+      AND  e.rpl_method_code   = s.rpl_method_code
+      AND  e.rpl_dist_method   = d.dmt_code
+      AND  e.pmh_tech_key      = h.pmh_tech_key
+      AND  e.PRF_TECH_KEY      = pe.PRF_TECH_KEY
+)
+SELECT DISTINCT
+       P.E_TIENDA,
+       P.E_PRODUCTO,
+       P.E_SEMANA_VENTA,
+       P.E_MIN,
+       P.E_MAX
+       --, U.*
+FROM   EDSR.temp_CargaMasiva_ParametrosPMM P
+       LEFT JOIN U
+         ON TRIM(P.E_TIENDA)       = TRIM(U.SUCURSAL)
+        AND TRIM(P.E_PRODUCTO)     = TRIM(U.SKU)
+        AND TRIM(P.E_SEMANA_VENTA) = TRIM(U.semanas)
+        AND TRIM(P.E_MIN)          = TRIM(U.min)
+        AND TRIM(P.E_MAX)          = TRIM(U.max)
+WHERE  U.SKU IS NULL;   -- <-- AQUÍ FILTRAS LOS QUE NO MATCHEAN
+
+
+
+
+select e.org_lvl_number sucursal,
+		e.prd_lvl_number sku,
+		h.prf_wgt_weeks semanas,
+		e.rpl_min_stk min,
+       	e.rpl_max_stk max       
+  from EPMM.rplpmhee e,
+       EDSR.tpprdmst f,
+       EPMM.whsprdee g,
+       (select distinct f.pmh_tech_key, f.prf_wgt_weeks from EPMM.RPLWGTEE f) h,
+       EPMM.rplmthcd s,
+       EPMM.rpldmtcd d,
+       epmm.RPLPFHEE pe
+ where (select x.caldat from EPMM.caldayee x) between e.rpl_begdate and
+       e.rpl_enddate
+   and e.prd_lvl_child = f.prd_lvl_child
+   and e.prd_lvl_child = g.prd_lvl_child
+   and g.org_lvl_child in
+       (select to_number(trim(param_value))
+          from EPMM.chlparam
+         where param_code in ('CENTRODIS'))
+   and e.rpl_method_code = s.rpl_method_code
+   and e.rpl_dist_method = d.dmt_code
+   and e.pmh_tech_key = h.pmh_tech_key
+   AND e.PRF_TECH_KEY= pe.PRF_TECH_KEY
+ AND TRIM(e.prd_lvl_number) IN ('43503','42966','45136','42965','40888','45131','45134','44390','45121','45126','43294','44554','45120','45119','45130','43293','45140','45137','43627','43290','45123','45122','45125','42964','43295','43296')
+ AND e.org_lvl_number = 103
+;
 
 
 SELECT EDSR.TEMP_TPCARPAR_SEQ.NEXTVAL AS SEC FROM DUAL;
@@ -779,3 +966,6 @@ SELECT * FROM EDSR.temp_CargaMasiva_ParametrosPMM;
 
 SELECT * FROM EDSR.TEMP_PARAMREPOSEM;
 SELECT * FROM EDSR.temp_CargaMasiva_ParametrosPMM;
+
+
+

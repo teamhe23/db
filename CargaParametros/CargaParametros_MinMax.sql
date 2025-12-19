@@ -1,22 +1,21 @@
 /*
  DELETE EDSR.temp_CargaMasivaMinMax;
- DELETE EDSR.TPCARPAR;
  ALTER SEQUENCE EDSR.TEMP_CargaMasivaMinMax_SEQ RESTART START WITH 1;
+ DELETE EDSR.TPCARPAR;
  COMMIT;
-
- DROP SEQUENCE EDSR.TEMP_CargaMasivaMinMax_SEQ;
- CREATE SEQUENCE EDSR.TEMP_CargaMasivaMinMax_SEQ
-    START WITH 1
-    INCREMENT BY 1
-    NOMAXVALUE
-    NOCYCLE;
-
-  COMMIT;
  */
- -- Validacion Carga
-SELECT COUNT(1) FROM EDSR.temp_CargaMasivaMinMax;
+
+--VALIDACION
+SELECT COUNT(1) temp_CargaMasivaMinMax FROM EDSR.temp_CargaMasivaMinMax;
 SELECT * FROM EDSR.temp_CargaMasivaMinMax ORDER BY ID;
 SELECT * FROM EDSR.temp_CargaMasivaMinMax ORDER BY ID DESC;
+SELECT COUNT(1) from EDSR.TPCARPAR;
+BEGIN
+	DBMS_OUTPUT.PUT_LINE('Test');
+END;
+SELECT * FROM EDSR.temp_CargaMasivaMinMax WHERE E_PRODUCTO = '43881';
+SELECT * FROM EDSR.temp_CargaMasivaMinMax WHERE ID IN (508,507,509);
+--CARGA
 DECLARE
     TOTAL NUMBER := 0;
     MINIMO NUMBER := 0;
@@ -25,6 +24,7 @@ DECLARE
     p_secuencia NUMBER;
 
     V_PRD_LVL_NUMBER VARCHAR2(15);
+    
 
 BEGIN
     SELECT COUNT(*)
@@ -47,6 +47,7 @@ BEGIN
        DBMS_OUTPUT.PUT_LINE('MAXIMO: ' || MAXIMO);
        DBMS_OUTPUT.PUT_LINE('p_secuencia: ' || p_secuencia);
 
+       DBMS_OUTPUT.PUT_LINE('BEGIN: WHILE MINIMO <= MAXIMO LOOP');
         WHILE MINIMO <= MAXIMO LOOP
             SELECT E_PRODUCTO
             INTO V_PRD_LVL_NUMBER
@@ -59,8 +60,8 @@ BEGIN
                     RPL_SEQ = p_secuencia,
                     RPL_SEQ_REG = ID,
                     RPL_METHOD_CODE = 1,
-                    PRD_LVL_CHILD = S_OBT_PRODUCTO(E_PRODUCTO),
-                    ORG_LVL_CHILD = S_OBT_SUCURSAL(E_TIENDA),
+                    PRD_LVL_CHILD = EDSR.S_OBT_PRODUCTO(E_PRODUCTO),
+                    ORG_LVL_CHILD = EDSR.S_OBT_SUCURSAL(E_TIENDA),
                     RPL_DIST_METHOD = CASE WHEN E_METODO_RPL = 'OCS' THEN 2
                                            WHEN E_METODO_RPL = 'CAT' THEN 6
                                            WHEN E_METODO_RPL = 'RAT' THEN 3
@@ -74,7 +75,11 @@ BEGIN
             --DBMS_OUTPUT.PUT_LINE(V_PRD_LVL_NUMBER);
             COMMIT;
         END LOOP;
-
+        DBMS_OUTPUT.PUT_LINE('END: WHILE MINIMO <= MAXIMO LOOP');
+       
+	   MINIMO := MINIMO - 1 ;
+       DBMS_OUTPUT.PUT_LINE('PROCESADOS: ' || MINIMO);
+       DBMS_OUTPUT.PUT_LINE('INSERT INTO EDSR.TPCARPAR');
        INSERT INTO EDSR.TPCARPAR
           (
            RPL_SEQ,
@@ -104,6 +109,7 @@ BEGIN
         ;
        COMMIT;
 
+       DBMS_OUTPUT.PUT_LINE('Busca los productos que no tienen habilitado el cross-docking y los borra');
        -- Busca los productos que no tienen habilitado el cross-docking y los borra
         INSERT INTO TPCARPAR_REC_TMP
           (RPL_SEQ, RPL_SEQ_REG, PRD_LVL_CHILD, ORG_LVL_CHILD)
@@ -141,6 +147,7 @@ BEGIN
                    WHERE NOT NVL(PC2.ID, PC3.ID) IS NULL
                      AND SC.ORG_LVL_CHILD IS NULL);
 
+        DBMS_OUTPUT.PUT_LINE('DELETE FROM TPCARPAR');
         DELETE FROM TPCARPAR
         WHERE (RPL_SEQ, RPL_SEQ_REG) IN
                 (SELECT RPL_SEQ, RPL_SEQ_REG
@@ -153,6 +160,10 @@ BEGIN
     ELSE
         DBMS_OUTPUT.PUT_LINE('No se encontraron registros');
     END if;
+EXCEPTION
+	WHEN OTHERS THEN
+		DBMS_OUTPUT.PUT_LINE('HORROR: ' || SQLERRM);
+		DBMS_OUTPUT.PUT_LINE('ULTIMO SKU PROCESADO: ' || V_PRD_LVL_NUMBER);
 END;
 
 -- Validacion Carga
@@ -165,11 +176,21 @@ SELECT COUNT(1) FROM EDSR.TPCARPAR;
   Secuencia 61 (146 RAT)
   QA => Secuencia 75 (244 RAT 1era Semana)  12/12/2024 01:00
   Secuencia 398 (244 RAT 1era Semana)  12/12/2024 09:17
-  Secuencia 413 (581 OCS)  26/12/2024 16:06
+  Secuencia 413 (581 OCS) 26/12/2024 16:06
+  Secuencia 581 (581 OCS-RAT)  15/04/2025 22:57
+  Secuencia XXX (581 OCS-RAT)  16/04/2025 13:15
+  Secuencia 777 (508 RAT)  31/10/2025 14:52
 */
 
 BEGIN
-    EDSR.TP_PKG_REPDIN.SP_CARGA_PARAM_REPO(413,'SISTEMAS');
+    EDSR.TP_PKG_REPDIN.SP_CARGA_PARAM_REPO(777,'SISTEMAS');
+    COMMIT;
+    DBMS_OUTPUT.PUT_LINE('Carga Exitosa');
+EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        DBMS_OUTPUT.PUT_LINE('ERROR EN LA CARGA');
+        DBMS_OUTPUT.PUT_LINE('Descripcion: ' || sqlerrm);
 END;
 
 
@@ -196,7 +217,14 @@ SELECT RPL_SEQ,RPL_SEQ_REG,RPL_METHOD_CODE,PRD_LVL_CHILD,ORG_LVL_CHILD,RPL_DIST_
  FROM EDSR.TPCARPAR;
 
 
+ DROP SEQUENCE EDSR.TEMP_CargaMasivaMinMax_SEQ;
+ CREATE SEQUENCE EDSR.TEMP_CargaMasivaMinMax_SEQ
+    START WITH 1
+    INCREMENT BY 1
+    NOMAXVALUE
+    NOCYCLE;
 
+  COMMIT;
 SELECT EDSR.TEMP_CargaMasivaMinMax_SEQ.NEXTVAL AS SEC FROM DUAL;
 -- antes: temp_CargaMasiv4_ParametrosPMM
 CREATE TABLE EDSR.temp_CargaMasivaMinMax(

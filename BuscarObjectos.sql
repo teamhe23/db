@@ -10,6 +10,10 @@ WHERE
 ORDER BY line;
 
 SELECT *
-FROM dba_synonyms
+FROM dba_synonymsd
 WHERE  upper(synonym_name) like 'FN_%'; --FN_FEC_APE
 
+
+SELECT * FROM dba_source
+WHERE upper(TEXT) LIKE '%INTO B2B_OC_RCV_ENVIO%'
+;
