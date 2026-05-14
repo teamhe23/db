@@ -1,0 +1,259 @@
+--Reimpulsos de creacion de  ASN
+--112152
+
+SELECT LTRIM(asn.SHIPMENT_NBR, 'NAC000') AS NroCarga,
+       asn.SHIPMENT_NBR,asn.FLG_ERROR, asn.JSON_RESPONSE,ASN.fec_procesado, ASN.*
+FROM wms_asn_hdr_envio asn
+ORDER BY ID_ASN_HDR DESC FETCH FIRST 20 ROWS ONLY;
+
+SELECT LTRIM(asn.SHIPMENT_NBR, 'NAC000') AS NroCarga,
+       asn.SHIPMENT_NBR,asn.FLG_ERROR, asn.JSON_RESPONSE,ASN.fec_procesado, ASN.*
+FROM wms_asn_hdr_envio asn
+--UPDATE EDSR.wms_asn_hdr_envio SET fec_procesado = NULL
+WHERE SHIPMENT_NBR LIKE ('%917226%') -- AND FLG_ERROR = '1'; --917468
+--WHERE XML_REQUEST LIKE ('%126204%')
+
+;
+
+
+     --FLG_ERROR = 1;
+SELECT SYSDATE AS FECH FROM DUAL;
+COMMIT;
+/*
+ * <html>
+<head><title>502 Bad Gateway</title></head>
+<body>
+<center><h1>502 Bad Gateway</h1></center>
+<hr><center>nginx</center>
+</body>
+</html>
+
+ * */
+
+/*
+ 123378	=> NAC000916055
+ 123387
+ 123388
+ 124172
+ 124533
+ 124544
+ 124554
+ 124558
+ */
+
+DECLARE
+  -- Definimos el tipo de colección de SKUs
+  TYPE t_skus IS TABLE OF VARCHAR2(10) INDEX BY PLS_INTEGER;
+  skus t_skus;
+  
+  -- Variable para almacenar el SKU en el bucle
+  sku VARCHAR2(10);
+  IDENTIFICADOR EDSR.WMS_MODELO_REQUEST.IDENTIFICADOR%TYPE;
+  MODELO EDSR.WMS_MODELO_REQUEST.MODELO%TYPE;
+  
+  modelo_clob CLOB;
+  lineas_clob CLOB;
+  
+BEGIN
+  -- Asignamos los valores a la colección
+  skus(1) := '123378';
+  skus(2) := '123387';
+  skus(3) := '123388';
+  skus(4) := '124533';
+  skus(5) := '124172';
+  skus(6) := '124544';
+  skus(7) := '124554';
+  skus(8) := '124558';
+
+  -- Imprimimos un mensaje de inicio
+  DBMS_OUTPUT.PUT_LINE('----BEGIN----');
+
+  -- Recorremos los registros de la colección
+  FOR i IN 1 .. skus.COUNT LOOP
+    sku := skus(i);  -- Asignamos el valor de cada elemento de la colección a sku
+    
+    BEGIN
+      -- Seleccionamos el modelo CLOB de la base de datos
+      SELECT MODELO, IDENTIFICADOR
+      INTO MODELO, IDENTIFICADOR
+      FROM EDSR.WMS_MODELO_REQUEST
+      WHERE 
+        ID_TIPO = 2 
+        AND IDENTIFICADOR LIKE 'NAC%'
+        AND MODELO LIKE '%' || sku || '%';
+
+      -- Inicializamos la variable para las líneas procesadas
+      lineas_clob := '';
+
+      -- Ahora recorremos cada línea del CLOB y filtramos
+      /*
+       FOR line IN (SELECT REGEXP_SUBSTR(modelo_clob, '[^' || CHR(10) || ']+', 1, LEVEL) AS linea
+                   FROM dual
+                   CONNECT BY REGEXP_SUBSTR(modelo_clob, '[^' || CHR(10) || ']+', 1, LEVEL) IS NOT NULL) LOOP
+        -- Comprobamos si la línea empieza con [H2] y contiene el SKU
+        IF line.linea LIKE '[H2]%' AND line.linea LIKE '%' || sku || '%' THEN
+          lineas_clob := lineas_clob || line.linea || CHR(10);  -- Agregamos la línea al resultado
+        ELSIF NOT line.linea LIKE '[H2]%' THEN
+          lineas_clob := lineas_clob || line.linea || CHR(10);  -- Mantener líneas que no comienzan con [H2]
+        END IF;
+      END LOOP;
+	 */
+      
+      DBMS_OUTPUT.PUT_LINE('SKU: ' || sku || ' | IDENTIFICADOR: ' || IDENTIFICADOR);
+      -- Mostramos el resultado final
+      /*
+      DBMS_OUTPUT.PUT_LINE('------------------------------------------------');
+      DBMS_OUTPUT.PUT_LINE('SKU: ' || sku );
+      DBMS_OUTPUT.PUT_LINE('IDENTIFICADOR: ' || IDENTIFICADOR);
+      DBMS_OUTPUT.PUT_LINE(MODELO);  -- Mostramos el CLOB filtrado
+      DBMS_OUTPUT.PUT_LINE('------------------------------------------------');
+      */
+
+    EXCEPTION
+      WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('--------');
+        DBMS_OUTPUT.PUT_LINE('ERROR: ' || SQLERRM);
+        DBMS_OUTPUT.PUT_LINE('No hay MODELO PARA SKU: ' || sku);
+        DBMS_OUTPUT.PUT_LINE('--------');
+    END;
+  END LOOP;
+  
+  DBMS_OUTPUT.PUT_LINE('----END----');
+END;
+
+
+
+
+/*
+ 123378	123387	123388	=> NAC000916055 => 2025-03-07 12:56:52.000
+ 124533 => NAC000916566 => 
+ NAC000916569 => 
+ */
+
+SELECT * FROM WMS_MODELO_REQUEST
+--UPDATE WMS_MODELO_REQUEST SET FLAG_PROCESADO= '1', FEC_PROCESO = NULL
+--WHERE ID_MODELO = 97124;
+WHERE ID_TIPO = 2 AND MODELO LIKE '%NAC000916566%';
+--WHERE ID_TIPO = 2 AND MODELO LIKE '%123378%';
+COMMIT;
+
+SELECT CREATE_DATE, ERR_CODE, HDR.* FROM WMS_RCV_ASN_HDR HDR 
+--UPDATE WMS_RCV_ASN_HDR SET SHIPMENT_NBR = 'NAC000916055-X'
+WHERE SHIPMENT_NBR IN ('NAC000916055-X') ; --NAC000916009-X
+COMMIT;
+
+SELECT * FROM EDSR.WMS_MODELO_REQUEST WHERE ID_MODELO = 99728;
+SELECT * FROM EDSR.WMS_MODELO_REQUEST WHERE ID_MODELO = 99732;
+
+SELECT * FROM EDSR.PMGSTSCD;
+SELECT * FROM EDSR.PMGHDREE WHERE PMG_PO_NUMBER IN (123378,123387,123388,124533,124172,124544,124554,124558);
+
+SELECT * FROM EDSR.wms_rcv_asn_hdr WHERE SHIPMENT_NBR = 'NAC000916569';
+SELECT err_code,DTL.* FROM EDSR.wms_rcv_asn_dtl DTL WHERE HDR_GROUP_NBR = 14272;
+
+SELECT * FROM EDSR.sqlerree WHERE sql_text LIKE '%14273%';
+
+SELECT * FROM EDSR.sqlerree 
+WHERE 
+	error_date < TO_DATE('2025-03-08', 'YYYY-MM-DD') 
+	AND error_date >=TO_DATE('2025-03-07', 'YYYY-MM-DD') 
+ORDER BY error_date DESC;
+
+
+
+SELECT * FROM EDSR.WMS_MODELO_REQUEST WHERE MODELO LIKE '%905089%';
+SELECT CREATE_DATE, ERR_CODE, HDR.* FROM WMS_RCV_ASN_HDR HDR 
+WHERE SHIPMENT_NBR LIKE '%905089%';
+--insert
+DECLARE
+	P_ID_MODELO NUMERIC;
+	P_MODELO CLOB;
+BEGIN
+
+	P_MODELO := '[H1]NAC000916566|101|HESA|||NAC|916566||||||417|20250318000000|76||916566||||20250319000000
+[H2]7|10800000057595|1.5|5278.5|22601|22601|||||||0|0|0||||25||124533||MERCA|25||||||||||49||||||
+[H2]8|10800000057601|2.46|14850|22603|22603|||||||0|0|0||||10||124533||MERCA|10||||||||||50||||||
+[H2]9|10800000057618|0.5|513|27010|27010|||||||0|0|0||||1||124533||MERCA|1||||||||||56||||||
+[H2]10|10800000057625|1.2|2572.5|27011|27011|||||||0|0|0||||2||124533||MERCA|2||||||||||57||||||
+[H2]11|10800000057632|0.1|963.5|22463|22463|||||||0|0|0||||1||124533||MERCA|1||||||||||33||||||
+[H2]12|10800000057649|0.5|55.76|29114|29114|||||||0|0|0||||1||124533||MERCA|1||||||||||61||||||
+[H2]13|10800000057656|9|46875|38363|38363|||||||0|0|0||||5||124533||MERCA|5||||||||||7||||||
+[H2]14|10800000057663|3|603.72|22611|22611|||||||0|0|0||||6||124533||MERCA|6||||||||||51||||||
+[H2]15|10800000057670|0.73|221.364|22612|22612|||||||0|0|0||||1||124533||MERCA|1||||||||||52||||||
+[H2]16|10800000057687|3.1|27000|38366|38366|||||||0|0|0||||1||124533||MERCA|1||||||||||8||||||
+[H2]17|10800000057694|10.4|56000|38405|38405|||||||0|0|0||||4||124533||MERCA|4||||||||||10||||||
+[H2]18|10800000057700|2.76|13725|22565|22565|||||||0|0|0||||6||124533||MERCA|6||||||||||46||||||
+[H2]19|10800000057717|0.14|168|22523|22523|||||||0|0|0||||1||124533||MERCA|1||||||||||40||||||
+[H2]20|10800000057724|3.1|2261.875|22525|22525|||||||0|0|0||||5||124533||MERCA|5||||||||||41||||||
+[H2]21|10800000057731|1.1|2182.125|22464|22464|||||||0|0|0||||11||124533||MERCA|11||||||||||34||||||
+[H2]22|10800000057748|0.88|727.375|22465|22465|||||||0|0|0||||11||124533||MERCA|11||||||||||35||||||
+[H2]23|10800000057755|15.6|23507.4|22281|22281|||||||0|0|0||||2||124533||MERCA|2||||||||||16||||||
+[H2]24|10800000057762|6.42|9000|38490|38490|||||||0|0|0||||6||124533||MERCA|6||||||||||12||||||
+[H2]25|10800000057779|0.9|1530|22287|22287|||||||0|0|0||||3||124533||MERCA|3||||||||||18||||||
+[H2]26|10800000057786|6.5|5965.05|22297|22297|||||||0|0|0||||13||124533||MERCA|13||||||||||19||||||
+[H2]27|10800000057793|1|4000|30346|30346|||||||0|0|0||||1||124533||MERCA|1||||||||||66||||||
+[H2]28|10800000057809|2|8000|30348|30348|||||||0|0|0||||2||124533||MERCA|2||||||||||67||||||
+[H2]29|10800000057816|2|8000|30350|30350|||||||0|0|0||||2||124533||MERCA|2||||||||||68||||||
+[H2]30|10800000057823|0.56|1060.74|22298|22298|||||||0|0|0||||2||124533||MERCA|2||||||||||20||||||
+[H2]31|10800000057830|0.0992|3425.84|22305|22305|||||||0|0|0||||8||124533||MERCA|8||||||||||21||||||
+[H2]32|10800000057847|1.376|7587.84|22306|22306|||||||0|0|0||||16||124533||MERCA|16||||||||||22||||||
+[H2]33|10800000057854|1.1|3675|22273|22273|||||||0|0|0||||5||124533||MERCA|5||||||||||15||||||
+[H2]34|10800000057861|0.84|1872|30367|30367|||||||0|0|0||||4||124533||MERCA|4||||||||||71||||||
+[H2]35|10800000057878|2|1500|30358|30358|||||||0|0|0||||2||124533||MERCA|2||||||||||69||||||
+[H2]36|10800000057885|0.48|743.82|30363|30363|||||||0|0|0||||2||124533||MERCA|2||||||||||70||||||
+[H2]37|10800000057892|1|4000|30344|30344|||||||0|0|0||||1||124533||MERCA|1||||||||||65||||||
+[H2]38|10800000057908|0.3|1187.375|22308|22308|||||||0|0|0||||1||124533||MERCA|1||||||||||23||||||
+[H2]39|10800000057915|1.2|2937.6|22494|22494|||||||0|0|0||||2||124533||MERCA|2||||||||||37||||||
+[H2]40|10800000057922|0.22|740|22614|22614|||||||0|0|0||||1||124533||MERCA|1||||||||||53||||||
+[H2]41|10800000057939|0.32|980|30334|30334|||||||0|0|0||||8||124533||MERCA|8||||||||||63||||||
+[H2]42|10800000057946|0.96|2940|30340|30340|||||||0|0|0||||12||124533||MERCA|12||||||||||64||||||
+[H2]43|10800000057953|0.0834|1353.75|22324|22324|||||||0|0|0||||2||124533||MERCA|2||||||||||24||||||
+[H2]44|10800000057960|1.6|180.54|22444|22444|||||||0|0|0||||4||124533||MERCA|4||||||||||31||||||
+[H2]45|10800000057977|1.05|1102.5|22615|22615|||||||0|0|0||||3||124533||MERCA|3||||||||||54||||||
+[H2]46|10800000057984|0.98|462.875|22467|22467|||||||0|0|0||||7||124533||MERCA|7||||||||||36||||||
+[H2]47|10800000057991|0.96|1556.1|22522|22522|||||||0|0|0||||3||124533||MERCA|3||||||||||39||||||
+[H2]48|10800000058004|0.0927|959.975|22526|22526|||||||0|0|0||||1||124533||MERCA|1||||||||||42||||||
+[H2]49|10800000058011|11.2|18525|22570|22570|||||||0|0|0||||5||124533||MERCA|5||||||||||47||||||
+[H2]50|10800000058028|2.48|3843|22442|22442|||||||0|0|0||||1||124533||MERCA|1||||||||||30||||||
+[H2]51|10800000058035|12.6|105091.2|38371|38371|||||||0|0|0||||4||124533||MERCA|4||||||||||9||||||
+[H2]52|10800000058042|12.6|105091.2|38371|38371|||||||0|0|0||||4||124533||MERCA|4||||||||||9||||||
+[H2]53|10800000058059|15.65|78750|38361|38361|||||||0|0|0||||5||124533||MERCA|5||||||||||6||||||
+[H2]54|10800000058066|10.2|126000|38427|38427|||||||0|0|0||||4||124533||MERCA|4||||||||||11||||||
+[H2]55|10800000058073|14.7|55200|38821|38821|||||||0|0|0||||1||124533||MERCA|1||||||||||14||||||
+[H2]56|10800000058080|14.7|55200|38821|38821|||||||0|0|0||||1||124533||MERCA|1||||||||||14||||||
+[H2]57|10800000058097|5.78|25844|22556|22556|||||||0|0|0||||1||124533||MERCA|1||||||||||43||||||
+[H2]58|10800000058110|10|621000|36032|36032|||||||0|0|0||||10||124533||MERCA|10||||||||||3||||||
+[H2]59|10800000058127|8.2|19320|22558|22558|||||||0|0|0||||4||124533||MERCA|4||||||||||44||||||
+[H2]60|10800000058134|6.15|18861.375|22559|22559|||||||0|0|0||||3||124533||MERCA|3||||||||||45||||||
+[H2]61|10800000058141|12|32472|36036|36036|||||||0|0|0||||2||124533||MERCA|2||||||||||4||||||
+[H2]62|10800000058158|0.4|892.4|27015|27015|||||||0|0|0||||1||124533||MERCA|1||||||||||59||||||
+[H2]63|10800000058165|15|15|34154|34154|||||||0|0|0||||15||124533||MERCA|15||||||||||72||||||
+[H2]64|10800000058172|6.24|18216|22424|22424|||||||0|0|0||||6||124533||MERCA|6||||||||||29||||||
+[H2]65|10800000058189|0.25|15.4|22340|22340|||||||0|0|0||||10||124533||MERCA|10||||||||||25||||||
+[H2]66|10800000058196|7.2|3159|22374|22374|||||||0|0|0||||6||124533||MERCA|6||||||||||27||||||
+[H2]67|10800000058202|4.398|8910|35202|35202|||||||0|0|0||||6||124533||MERCA|6||||||||||73||||||
+[H2]68|10800000058219|14.4|28080|22411|22411|||||||0|0|0||||12||124533||MERCA|12||||||||||28||||||
+[H2]69|10800000058226|2.52|6480|35203|35203|||||||0|0|0||||18||124533||MERCA|18||||||||||1||||||
+[H2]70|10800000058233|0.2688|8958.6|22351|22351|||||||0|0|0||||24||124533||MERCA|24||||||||||26||||||'
+	;
+	
+	P_ID_MODELO := edsr.SEQ_WMS_MODELO_REQUEST.NEXTVAL;
+	DBMS_OUTPUT.PUT_LINE('P_ID_MODELO: ' || P_ID_MODELO);
+	
+	INSERT INTO EDSR.WMS_MODELO_REQUEST(
+      ID_MODELO,
+      ID_TIPO,
+      MODELO,
+      MESSAGE_ID
+    )
+    VALUES(
+	P_ID_MODELO,
+  	2,
+  	P_MODELO,
+  	'14292572527877962'
+    );
+	
+EXCEPTION
+	WHEN OTHERS THEN
+		DBMS_OUTPUT.PUT_LINE('P_ID_MODELO: ' || SQLERRM);
+END;

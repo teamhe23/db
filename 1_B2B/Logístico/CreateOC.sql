@@ -1,0 +1,4 @@
+SELECT * FROM edsr.b2b_oc_envio
+WHERE PMG_PO_NUMBER IN (160410,160409)
+;
+

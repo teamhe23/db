@@ -417,6 +417,8 @@ BEGIN
     ELSE
         DBMS_OUTPUT.PUT_LINE('No se encontraron registros');
     END if;
+        
+        
 EXCEPTION
 	WHEN OTHERS THEN
 		DBMS_OUTPUT.PUT_LINE('HORROR: ' || SQLERRM);
@@ -519,13 +521,15 @@ SELECT RPL_SEQ, RPL_SEQ_REG, WGT_WEEK, COUNT(*) FROM EDSR.TPCARSEM GROUP BY RPL_
   
   Secuencia 847 (18808 OCS 8 Semanas)  15/12/2025 22:21
   Secuencia 848 (9795 OCS 57 Semanas)  15/12/2025 22:40
+  Secuencia 910 (14830 RAT 1 Semanas)  06/02/2026 19:30
+  Secuencia 931 (14381 RAT-OCS 2 Semanas)  13/02/2026 22:03
 */
 
 -------------------------------------------------
 --          Carga FINAL
 -------------------------------------------------
 BEGIN
-    EDSR.TP_PKG_REPDIN.SP_CARGA_PARAM_REPO(848,'SISTEMAS');
+    EDSR.TP_PKG_REPDIN.SP_CARGA_PARAM_REPO(936,'SISTEMAS');
     COMMIT;
 	DBMS_OUTPUT.PUT_LINE('----------------------------');
     DBMS_OUTPUT.PUT_LINE('Carga Final Exitosa');

@@ -1,0 +1,620 @@
+SELECT * FROM EDSR.WMS_LOG_INTEGRACION_OC WHERE ID_TIPO = 7 AND IDENTIFICADOR = '1784863';
+
+ select * from WMS_MODELO_REQUEST WHERE MESSAGE_ID = '11937740904110187';
+ select * from WMS_MODELO_REQUEST WHERE ID_MODELO = 44733 AND ID_TIPO = 2;
+
+SELECT * FROM EDSR.WMS_STORE_ENVIO; -- Tiendas
+SELECT * FROM EDSR.wms_tipo_integracion;
+SELECT * FROM EDSR.WMS_CONF_AJUSTE;
+SELECT * FROM EDSR.WMS_CONF_AJUSTE_INV;
+
+SELECT * FROM EDSR.wms_tipo_integracion_org WHERE ORG_LVL_CHILD = '419';
+SELECT * FROM EDSR.wms_tipo_integracion_org WHERE ORG_LVL_CHILD = '423';
+
+INSERT INTO EDSR.WMS_TIPO_INTEGRACION_ORG (ID_TIPO, ORG_LVL_CHILD) VALUES (4, 423);
+INSERT INTO EDSR.WMS_TIPO_INTEGRACION_ORG (ID_TIPO, ORG_LVL_CHILD) VALUES (5, 423);
+INSERT INTO EDSR.WMS_TIPO_INTEGRACION_ORG (ID_TIPO, ORG_LVL_CHILD) VALUES (13, 423);
+INSERT INTO EDSR.WMS_TIPO_INTEGRACION_ORG (ID_TIPO, ORG_LVL_CHILD) VALUES (14, 423);
+INSERT INTO EDSR.WMS_TIPO_INTEGRACION_ORG (ID_TIPO, ORG_LVL_CHILD) VALUES (15, 423);
+INSERT INTO EDSR.WMS_TIPO_INTEGRACION_ORG (ID_TIPO, ORG_LVL_CHILD) VALUES (16, 423);
+/**********************************************************
+--                      CITAS
+-*****************************************************
+       FACILITY_CODE => Store Tiendas (101,102)
+---------------------------------------------------
+  B2B Logistico => PMM (wms_cita_envio)
+---------------------------------------------------
+KSH => /interfaces/b2b/import/in/ksh/hp_b2b_cita.ksh
+LOG => /interfaces/b2b/import/in/log/hp_b2b_cita_20241017 (Si falla revisar)
+---------------------------------------------------
+LOAD DATA
+APPEND
+INTO TABLE edsr.wms_cita_envio
+fields terminated by '|'
+(
+facility_code,
+company_code,
+appt_nbr,
+load_nbr,
+dock_type,
+action_code,
+preferred_dock_nbr,
+planned_start_ts,
+duration,
+estimated_units,
+carrier_info
+)
+FACILITY_CODE,COMPANY_CODE,APPT_NBR,LOAD_NBR,DOCK_TYPE,ACTION_CODE,PREFERRED_DOCK_NBR,PLANNED_START_TS,DURATION,ESTIMATED_UNITS,CARRIER_INFO
+101,HESA,910670,910670,GEN,CREATE,P2,20241017153000,30,360.00000,PRODUCTO DEL SOL ECUADOR PRODELSOLEC CI
+
+
+---------------------------------------------------
+  PMM (wms_cita_envio) => WMS
+---------------------------------------------------
+DEMON => LLEVA LA CITA POR MEDIO DE API WMS
+*/
+SELECT * FROM wms_cita_envio ORDER BY FEC_PROCESADO DESC FETCH FIRST 20 ROWS ONLY ;
+
+ SELECT *
+      FROM B2B_OC_CANCEL_ENVIO OC
+      WHERE
+           OC.PMG_PO_NUMBER = '114034'
+          OC.FEC_PROCESADO IS NULL;
+
+SELECT
+             SHD.PMG_PO_NUMBER,
+             SHD.PMG_CNCL_BY_DATE,
+             SHD.PMG_CANCEL_DATE, SHD.*
+
+      FROM SDIPMGHDE SHD
+      WHERE SHD.PMG_PO_NUMBER = '114034'
+      WHERE SHD.TRAN_TYPE IN ('A', 'C')
+        AND SHD.DOWNLOAD_DATE_2 IS NULL
+        AND SHD.PMG_STAT_CODE = 7
+        AND EXISTS(
+                   SELECT 1
+                   FROM B2B_OC_ENVIO X
+                   WHERE X.PMG_PO_NUMBER = '114034'
+                     AND X.FEC_PROCESADO IS NOT NULL
+                     AND X.FLG_ERROR = '0'
+                  );
+SELECT *
+                   FROM B2B_OC_ENVIO X
+                   WHERE X.PMG_PO_NUMBER = '114034'
+                     AND X.FEC_PROCESADO IS NOT NULL
+                     AND X.FLG_ERROR = '0'
+/*
+ORG_LVL_NUMBER    ORG_LVL_CHILD
+101                 419
+102                 423
+851                 420
+ */
+
+SELECT ORG.ORG_LVL_NUMBER, ORG.* FROM EDSR.orgmstee ORG WHERE ORG_LVL_NUMBER IN ('101','102','851');
+ select sdi.org_lvl_child_s, sdi.audit_number, sdi.DOWNLOAD_DATE_1
+    from sdiorgmst sdi
+      inner join (
+                  select o.org_lvl_child
+                  from orgmstee o
+                  where o.org_lvl_id = 1
+                  start with o.org_lvl_child = (select x.param_value from chlparam x where x.param_code = 'SUCTDA')
+                  connect by prior o.org_lvl_child = o.org_lvl_parent
+                 ) uni on uni.org_lvl_child = sdi.org_lvl_child_s
+    where sdi.download_date_1 is null;
+
+--OC
+SELECT PMG.DOWNLOAD_DATE , PMG.* FROM EDSR.pmghdree PMG where PMG.DOWNLOAD_DATE is not null ORDER BY PMG.DOWNLOAD_DATE DESC ;
+SELECT PMG.DOWNLOAD_DATE, PMG.PRIM_ORG_LVL_NUMBER , PMG.* FROM EDSR.pmghdree PMG where pmg_po_number IN (109750) ;
+SELECT * FROM EDSR.PMGDTLEE where pmg_po_number IN (113444) ;
+
+select RCV.FEC_PROC_LOG,RCV.RCV_SESSION_ID, RCV.* from edsr.B2B_OC_RCV_ENVIO RCV WHERE PMG_PO_NUMBER IN (113444,110191) ;
+select RCV.FEC_PROC_LOG, RCV.* from edsr.B2B_OC_RCV_ENVIO RCV WHERE RCV_SESSION_ID = 110320;
+SELECT * FROM RCVSSDEE WHERE RCV_SESSION_ID = ;
+
+select sdi.pmg_po_number,
+    max(sdi.audit_number) as audit_number
+from sdipmghde sdi
+where sdi.org_lvl_child in (select org.org_lvl_child from wms_tipo_integracion_org org where org.id_tipo = 4)
+    and sdi.tran_type = 'A'
+    and sdi.download_date_1 is null
+    and sdi.pmg_stat_code = 4
+group by sdi.pmg_po_number
+;
+
+
+SELECT * FROM WMS_ORDER_HDR FETCH FIRST 10 ROWS ONLY;
+
+SELECT * FROM GRE_MODELO_WMS FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_ACTIVITY_CODE FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_ASN_DTL FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_ASN_DTL_ENVIO FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_ASN_HDR FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_ASN_HDR_ENVIO FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_BARCODE_ENVIO FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_B2B_DESPACHO_ASN FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_CITA_ENVIO FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_CONF_AJUSTE FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_CONF_AJUSTE_INV FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_DESPACHO_TRF FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_ERROR_INT FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_EVENTO_DET FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_EVENTO_ENC FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_INV_HISTORY FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_INV_HISTORY_LOAD FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_ITEM_ENVIO FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_MAPEO_MOV_INV FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_MODELO_REQUEST FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_OC_PENDIENTE FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_ORDER_DTL FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_ORDER_DTL_ENVIO FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_ORDER_HDR FETCH FIRST 10 ROWS ONLY;
+SELECT HDR.TRF_NUMBER, HDR.* FROM WMS_ORDER_HDR_ENVIO HDR ORDER BY FEC_REG DESC FETCH FIRST 50 ROWS ONLY;
+SELECT HDR.TRF_NUMBER, HDR.* FROM WMS_ORDER_HDR_ENVIO HDR WHERE TRF_NUMBER = 50925;
+
+/*******************************************************************************
+                            TRANSFERENCIAS
+********************************************************************************/
+
+
+WHERE
+    CUST_SHORT_TEXT_2 IS NOT NULL
+                                     ORDER BY DTL.ID_ORDER_HDR DESC
+
+FETCH FIRST 20 ROWS ONLY ;
+
+SELECT * FROM WMS_ORDER_HDR_ENVIO  ORDER BY FEC_REG DESC FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_PARAMETROS FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_PIKEXP_MOV_INV FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_PURCHASEORDER_ENVIO FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_RCV_ASN_DTL FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_RCV_ASN_HDR FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_RET_MOTIVO FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_RETORNOS FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_SHP_LOAD_DTL FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_SHP_LOAD_HDR FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_STORE_ENVIO FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_TIPO_INTEGRACION FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_TIPO_INTEGRACION_ORG FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_TIPO_INTERFAZ FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_TIPO_MODELO_REQUEST FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_TRF_OC_FEC_PRED FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_VENDOR_ENVIO FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_VENDOR_ENVIO_ANT FETCH FIRST 10 ROWS ONLY;
+/*
+ORG_LVL_NUMBER => ORG_LVL_CHILD
+101 => 419
+102 => 423
+851 => 420
+
+ transferencia de tienda 101 a 102
+
+    50926   SI VIAJO    (851 => 101)
+    50925   NO VIAJO    (101 => 102)
+
+*/
+SELECT ORG.ORG_LVL_NUMBER, ORG.* FROM ORGMSTEE ORG WHERE ORG.ORG_LVL_NUMBER IN (101,851,102);
+--SELECT * FROM TRFHDREE WHERE TRF_SHIP_LOC = 419 AND TRF_REC_LOC = 420 ORDER BY TRF_ENTRY_DATE DESC;
+
+SELECT * FROM ALL_SOURCE WHERE UPPER(TEXT) LIKE '%TRFHDREE%';
+SELECT OWNER,NAME, TYPE FROM ALL_SOURCE WHERE UPPER(TEXT) LIKE '%TRFHDREE%' GROUP BY OWNER,NAME, TYPE;
+SELECT OWNER,NAME, TYPE FROM ALL_SOURCE WHERE UPPER(TEXT) LIKE '%TRFHDREE%' AND NAME LIKE 'PKG_%' GROUP BY OWNER,NAME, TYPE;
+SELECT * FROM TRFHDREE WHERE TRF_NUMBER IN (50692,50926,50925);
+
+SELECT * FROM TRFHDREE ORDER BY TRF_ENTRY_DATE DESC;
+SELECT * FROM TRFHDREE WHERE TRF_SHIP_DATE IS NULL;
+SELECT * FROM TRFDTLAE WHERE TRF_SHIP_DATE IS NULL;
+SELECT * FROM TRFHDRAE WHERE TRF_SHIP_DATE IS NULL;
+SELECT * FROM TRFSTCEE;
+SELECT * FROM TRFSTLEE;
+SELECT * FROM TRFSTSCD;
+
+SELECT * FROM TRFDTLEE;
+SELECT * FROM wms_tipo_integracion_org;
+SELECT * FROM wms_tipo_interfaz;
+select * from wms_parametros parwhere WHERE parwhere.cod_par = 'COD_RAZ_REASIG';
+
+SELECT * FROM ORGMSTEE WHERE ORG_LVL_NUMBER IN (101,102,851);
+SELECT PARAM_VALUE FROM CHLPARAM WHERE PARAM_CODE = 'SUCTDA';
+SELECT C.ORG_LVL_NUMBER, C.*
+                FROM ORGMSTEE C
+               WHERE C.ORG_LVL_NUMBER = 801;
+SELECT * FROM TRFSTSCD;
+select sdi.trf_number,sdi.download_date_1,trf.Trf_rls_pick_date,sdi.trf_type_code, sdi.action_code ,sdi.from_loc, trf.trf_status,sdi.reference, sdi.from_loc, sdi.*
+from sditrfdte sdi
+    inner join trfhdree trf on sdi.trf_number = trf.trf_number
+where trf.TRF_NUMBER IN (50692,50926,50925);
+;
+--c_trf_type_id_1         constant number(2) := 1;
+--c_tipo_int_trf_tda_tda  constant number(3) := 15;
+--c_trf_est_pickeo        constant number(2) := 3;
+
+select sdi.trf_number,
+             trf.trf_prior_id,
+             min(sdi.audit_number) as audit_number
+from sditrfdte sdi
+    inner join trfhdree trf ON trf.trf_number = sdi.trf_number
+where sdi.action_code = '00'
+    and sdi.trf_type_code IN (1) --c_trf_type_id_1
+    and sdi.from_loc in (
+                         select x2.org_lvl_number
+                         from wms_tipo_integracion_org x
+                           inner join orgmstee x2 on x2.org_lvl_child = x.org_lvl_child
+                         where x.id_tipo = 15 --c_tipo_int_trf_tda_tda
+                        )
+    and sdi.download_date_1 is null
+    and trf.trf_status = 3 --c_trf_est_pickeo
+    and sdi.reference NOT LIKE 'WMS%'
+group by sdi.trf_number,
+       trf.trf_prior_id;
+
+
+
+
+/*************************** END TRANSFERENCIAS *********************************/
+
+SELECT * FROM WMS_ASN_DTL WHERE PO_NBR = 113444;
+SELECT * FROM WMS_ASN_HDR WHERE HDR_GROUP_NBR = 113444;
+SELECT * FROM WMS_RCV_ASN_HDR WHERE SHIPMENT_NBR = 'NAC0000XXX';
+SELECT * FROM WMS_RCV_ASN_DTL WHERE HDR_GROUP_NBR = 110320 AND PO_NBR = '108902';
+SELECT * FROM PMGDTLEE WHERE PMG_PO_NUMBER = 110320;
+SELECT DTL.ITEM_ALTERNATE_CODE, SUM(RECEIVED_QTY) FROM WMS_RCV_ASN_DTL DTL WHERE HDR_GROUP_NBR = 4639 AND PO_NBR = '10892' GROUP BY ITEM_ALTERNATE_CODE;
+SELECT DISTINCT PO_NBR FROM WMS_RCV_ASN_DTL WHERE HDR_GROUP_NBR = 4639;
+SELECT * FROM EDSR.pmghdree where pmg_po_number IN (110320) ;
+SELECT * FROM EDSR.PMGDTLEE where pmg_po_number IN (110320) ;
+SELECT * FROM EDSR.TPPRDMST where PRD_LVL_NUMBER = '110320' ;
+SELECT * FROM EDSR.TPPRDMST where PRD_LVL_CHILD IN (110320) ;
+
+-- OC CANCELADAS
+--estado 4 es pendiente de recepción (OnOrder)
+--campo PMG_CNCL_BY_DATE es la fecha de vencimiento de la OC
+select oc.pmg_cncl_by_date,oc.PMG_CNCL_BY_DATE,oc.PMG_STAT_CODE, oc.* from edsr.pmghdree oc where pmg_po_number IN (108902) ;
+SELECT * FROM EDSR.PMGDTLEE where pmg_po_number IN (108902) ;
+SELECT * FROM EDSR.pmghdree where pmg_po_number IN (108902) ;
+SELECT * FROM EDSR.HP_OC_AMPLIACION where pmg_po_number IN (108902) ;
+SELECT SDI.DOWNLOAD_DATE_1, SDI.PMG_CANCEL_DATE, SDI.* FROM EDSR.sdipmghde SDI where SDI.pmg_po_number IN (108902) ORDER BY SDI.DOWNLOAD_DATE_1 DESC;
+select P.fec_procesado, P.id_wms, P.* from edsr.wms_purchaseorder_envio P
+--actualizar para ponerlo como pendiente y vuelva a enviar la interfaz
+--update edsr.wms_purchaseorder_envio set fec_procesado = null, id_wms = null
+where pmg_po_number IN (109750) and ID_TIPO = 4; --: CREATE:4 | UPDATE:16
+COMMIT;
+--110432
+--{"success":false,"response":{"message":"User inactive or deleted."}}
+SELECT * FROM wms_purchaseorder_envio WHERE JSON_RESPONSE LIKE '%User inactive or deleted%';
+
+
+
+SELECT * FROM wms_cita_envio WHERE JSON_RESPONSE LIKE '%Invalid username/password%';
+SELECT * FROM wms_asn_hdr_envio WHERE JSON_RESPONSE LIKE '%Invalid username/password%';
+SELECT * FROM wms_purchaseorder_envio WHERE JSON_RESPONSE LIKE '%User inactive or deleted%';
+SELECT * FROM wms_cita_envio WHERE JSON_RESPONSE LIKE '%Invalid username/password%';
+SELECT * FROM wms_asn_hdr_envio WHERE JSON_RESPONSE LIKE '%Invalid username/password%';
+-- Reimpulso de creacion de OC
+select P.fec_procesado, P.id_wms, P.* from edsr.wms_purchaseorder_envio P
+--update edsr.wms_purchaseorder_envio set fec_procesado = null, id_wms = null
+--where pmg_po_number IN (111124,111108,111103,111070,111112,111113,111110) and ID_TIPO = 4; --: CREATE:4 | UPDATE:16
+where pmg_po_number IN (111068,111069,111073,111074,111075,111076,111077,111078,111080,111081,111082,111083,111084,111090,111091,111093,111094,111098,111104,111107,111109,111114,111115,111116,111117,111118,111119,111120,111121,111122,111123,111127,111129,110816,110836,110846,110191,110795,110320,110756,110766,111000,111053,111054,111055,111056,111057,111058,111059,111060,111061,111062,111065) and ID_TIPO = 4; --: CREATE:4 | UPDATE:16
+
+-- Reimpulso de creacion de Productos SKUs
+SELECT * FROM EDSR.PRDMSTEE WHERE PRD_LVL_NUMBER IN ('36895','36901','36897','36903','36900','36898','36291','36437','36291','36291');
+SELECT * FROM EDSR.WMS_ITEM_ENVIO
+--UPDATE EDSR.WMS_ITEM_ENVIO WMS SET FEC_PROCESADO = NULL
+WHERE PRD_LVL_CHILD IN ('124952','125084','125488','125490','125491','125493','125494','125496') AND TRAN_TYPE = 'A';
+COMMIT;
+
+SELECT * FROM EDSR.WMS_ITEM_ENVIO WHERE FLG_ERROR = '1' AND TRAN_TYPE = 'C' FETCH FIRST 100 ROWS ONLY ;
+SELECT DISTINCT MENSAJE FROM EDSR.WMS_ITEM_ENVIO WHERE FLG_ERROR = '1' AND TRAN_TYPE = 'C';
+SELECT DISTINCT TRAN_TYPE FROM EDSR.WMS_ITEM_ENVIO;
+
+SELECT * FROM PRDMSTEE WHERE PRD_LVL_NUMBER = '36440';
+
+--Reimpulsos de creacion de CITAS
+select * from wms_cita_envio
+--UPDATE WMS_CITA_ENVIO SET fec_procesado = NULL
+where  LOAD_NBR IN (909589,909600,909559) AND FLG_ERROR = '1';
+
+--Listar pendientes
+ select id_cita, appt_nbr from wms_cita_envio where fec_procesado is null;
+
+select * from wms_cita_envio FETCH FIRST 10 ROWS ONLY;
+
+--Reimpulsos de creacion de  ASN
+--112152
+SELECT LTRIM(asn.SHIPMENT_NBR, 'NAC000') AS NroCarga, asn.SHIPMENT_NBR,asn.FLG_ERROR, asn.JSON_RESPONSE,fec_procesado FROM wms_asn_hdr_envio asn
+--UPDATE EDSR.wms_asn_hdr_envio SET fec_procesado = NULL
+WHERE asn.SHIPMENT_NBR IN ('NAC000910441')  AND FLG_ERROR = '1';
+    --AND FLG_ERROR = 1
+;
+SELECT * FROM  B2BACKEE2 ORDER BY B2B_DOWNLOAD_DATE DESC;
+SELECT * FROM wms_asn_hdr ORDER BY CREATE_DATE DESC ;
+SELECT * FROM wms_asn_hdr ORDER BY DOWNLOAD_DATE_1 DESC ;
+SELECT * FROM wms_asn_hdr_envio ORDER BY FEC_REG DESC ;
+SELECT * FROM wms_asn_hdr_envio WHERE SHIPMENT_NBR LIKE '%909982%';
+SELECT ID_ASN_HDR, ID_TIPO, FEC_REG, FEC_PROCESADO, FLG_ERROR, MENSAJE, ID_WMS, SHIPMENT_NBR, FACILITY_CODE, COMPANY_CODE, TRAILER_NBR, ACTION_CODE, REF_NBR, SHIPMENT_TYPE, LOAD_NBR, MANIFEST_NBR, TRAILER_TYPE, VENDOR_INFO, ORIGIN_INFO, ORIGIN_CODE, ORIG_SHIPPED_UNITS, LOCK_CODE, SHIPPED_DATE, ORIG_SHIPPED_LPNS, CUST_FIELD_1, CUST_FIELD_2, CUST_FIELD_3, CUST_FIELD_4, CUST_FIELD_5, HDR_GROUP_NBR, TRF_NUMBER FROM wms_asn_hdr_envio ORDER BY FEC_REG DESC ;
+SELECT ID_ASN_HDR, ID_TIPO, FEC_REG, FEC_PROCESADO, XML_REQUEST, JSON_RESPONSE, FLG_ERROR, MENSAJE, ID_WMS, SHIPMENT_NBR, FACILITY_CODE, COMPANY_CODE, TRAILER_NBR, ACTION_CODE, REF_NBR, SHIPMENT_TYPE, LOAD_NBR, MANIFEST_NBR, TRAILER_TYPE, VENDOR_INFO, ORIGIN_INFO, ORIGIN_CODE, ORIG_SHIPPED_UNITS, LOCK_CODE, SHIPPED_DATE, ORIG_SHIPPED_LPNS, CUST_FIELD_1, CUST_FIELD_2, CUST_FIELD_3, CUST_FIELD_4, CUST_FIELD_5, HDR_GROUP_NBR, TRF_NUMBER FROM wms_asn_hdr_envio ORDER BY FEC_REG DESC ;
+--insert into MY_TABLE ()
+SELECT * FROM wms_asn_hdr_envio WHERE TRUNC(FEC_REG) = TRUNC (SYSDATE);
+
+
+select * from wms_ib_shipment_hdr;
+select * from WMS_TRF_OC_FEC_PRED;
+select * from WMS_DESPACHO_TRF;
+select * from WMS_STORE_ENVIO;
+
+SELECT * FROM ALL_TABLES WHERE TABLE_NAME LIKE '%WMS%' ORDER BY TABLE_NAME ;
+SELECT * FROM WMS_ORDER_HDR;
+
+
+SELECT * FROM GRE_MODELO_WMS FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_ACTIVITY_CODE FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_ASN_DTL FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_ASN_DTL_ENVIO FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_ASN_HDR FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_ASN_HDR_ENVIO FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_BARCODE_ENVIO FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_B2B_DESPACHO_ASN FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_CITA_ENVIO FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_CONF_AJUSTE FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_CONF_AJUSTE_INV FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_DESPACHO_TRF FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_ERROR_INT FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_EVENTO_DET FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_EVENTO_ENC FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_INV_HISTORY FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_INV_HISTORY_LOAD FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_ITEM_ENVIO FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_MAPEO_MOV_INV FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_MODELO_REQUEST FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_OC_PENDIENTE FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_ORDER_DTL FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_ORDER_DTL_ENVIO FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_ORDER_HDR FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_ORDER_HDR_ENVIO FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_PARAMETROS FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_PIKEXP_MOV_INV FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_PURCHASEORDER_ENVIO FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_RCV_ASN_DTL FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_RCV_ASN_HDR FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_RET_MOTIVO FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_RETORNOS FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_SHP_LOAD_DTL FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_SHP_LOAD_HDR FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_STORE_ENVIO FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_TIPO_INTEGRACION FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_TIPO_INTEGRACION_ORG FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_TIPO_INTERFAZ FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_TIPO_MODELO_REQUEST FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_TRF_OC_FEC_PRED FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_VENDOR_ENVIO FETCH FIRST 10 ROWS ONLY;
+SELECT * FROM WMS_VENDOR_ENVIO_ANT FETCH FIRST 10 ROWS ONLY;
+
+
+--Listar pendientes
+select id_asn_hdr, shipment_nbr from wms_asn_hdr_envio where fec_procesado is null and id_tipo = 9;
+
+SELECT * FROM wms_asn_hdr_envio FETCH FIRST 1 ROWS ONLY ;
+
+SELECT * FROM wms_asn_hdr_envio WHERE SHIPMENT_NBR LIKE ('%909599%') ;
+SELECT * FROM wms_asn_hdr_envio WHERE SHIPMENT_NBR LIKE ('%909630%') ;
+SELECT * FROM wms_asn_hdr_envio WHERE SHIPMENT_NBR LIKE ('%909584%') ;
+SELECT * FROM wms_asn_hdr_envio WHERE SHIPMENT_NBR LIKE ('%909585%') ;
+SELECT * FROM wms_asn_hdr_envio WHERE SHIPMENT_NBR LIKE ('%909628%') ;
+SELECT * FROM wms_asn_hdr_envio WHERE SHIPMENT_NBR LIKE ('%909609%') ;
+SELECT * FROM wms_asn_hdr_envio WHERE SHIPMENT_NBR LIKE ('%909611%') ;
+
+SELECT * FROM wms_asn_hdr_envio WHERE SHIPMENT_NBR LIKE ('%909610%') ;
+SELECT DISTINCT  id_tipo FROM wms_asn_hdr_envio; --9, 10
+SELECT * FROM wms_asn_hdr_envio WHERE JSON_RESPONSE LIKE '%Invalid username/password%';
+SELECT id_asn_hdr,fec_procesado,xml_request,json_response,flg_error,mensaje FROM wms_asn_hdr_envio ORDER by FEC_PROCESADO DESC;
+
+/* Actualizar cuando se envia
+update wms_asn_hdr_envio
+      set  fec_procesado = sysdate,
+           xml_request   = p_xml_request,
+           json_response = p_json_response,
+           flg_error     = p_flg_error,
+           mensaje       = substr(p_mensaje, 0, 200)
+    where id_asn_hdr   = p_id_asn_hdr;
+*/
+BEGIN
+    UPDATE EDSR.WMS_ITEM_ENVIO WMS SET FEC_PROCESADO = NULL
+    WHERE PRD_LVL_CHILD IN ('124943') AND TRAN_TYPE = 'A';
+    COMMIT;
+EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+END;
+
+SELECT * FROM EDSR.WMS_ITEM_ENVIO WHERE FLG_ERROR = '1';
+
+SELECT PRD_LVL_NUMBER, PRD_LVL_CHILD FROM EDSR.PRDMSTEE WHERE PRD_LVL_NUMBER IN ('36277')  ;
+SELECT PRD_LVL_NUMBER, PRD_LVL_CHILD FROM EDSR.PRDMSTEE WHERE PRD_LVL_NUMBER IN ('35067','35014')  ;
+
+select P.fec_procesado, P.id_wms, P.* from edsr.wms_purchaseorder_envio P
+--actualizar para ponerlo como pendiente y vuelva a enviar la interfaz
+--update edsr.wms_purchaseorder_envio set fec_procesado = null, id_wms = null
+where pmg_po_number IN () and ID_TIPO = 4; --4: CREATE 16: UPDATE
+COMMIT;
+
+/*
+<html>
+<head><title>504 Gateway Time-out</title></head>
+<body>
+<center><h1>504 Gateway Time-out</h1></center>
+<hr><center>nginx</center>
+</body>
+</html>
+
+*/
+
+select P.fec_procesado, P.id_wms, P.* from edsr.wms_purchaseorder_envio P
+--actualizar para ponerlo como pendiente y vuelva a enviar la interfaz
+--update edsr.wms_purchaseorder_envio set fec_procesado = null, id_wms = null
+where pmg_po_number IN (117550) and ID_TIPO = 4; --4: CREATE 16: UPDATE
+COMMIT;
+
+ROLLBACK;
+
+
+
+/*
+rancher
+https://rancher.promart.pe/p/c-2lcgr:p-9pgzm/workload/deployment:he-ti-wms:he-ti-demon-wms-purchaseorder
+tiene menú contextual
+ */
+
+-- 3319
+SELECT * FROM edsr.cartel_dp
+where codigo_promocion=3364;
+SELECT p.ATR_CODE, p.* FROM EPMM.SDIPRDATI p;
+--PMM
+-- Mensajes
+select * from pmgstscd where pmg_stat_code IN (4,6,7);
+-- OC (pmg_po_number)
+select oc.PRIM_ORG_LVL_NUMBER,OC.PMG_STAT_CODE, oc.* from pmghdree oc WHERE pmg_po_number IN (110320,110191);
+select * from WMS_MODELO_REQUEST WHERE IDENTIFICADOR LIKE '%908761%'; --NAC000908761
+select * from WMS_MODELO_REQUEST WHERE MESSAGE_ID = '11937740904110187';
+
+select oc.PRIM_ORG_LVL_NUMBER,OC.PMG_STAT_CODE, oc.* from pmghdree oc WHERE pmg_po_number IN (108902);
+select RCV.FEC_PROC_LOG, RCV.* from edsr.B2B_OC_RCV_ENVIO RCV WHERE pmg_po_number IN (108902) AND impuesto_fin = '0';
+
+select oc.PMG_EFFECT_DATE,oc.PRIM_ORG_LVL_NUMBER, oc.* from pmghdree oc order by oc.PMG_EFFECT_DATE DESC;
+select oc.PMG_EFFECT_DATE,oc.PRIM_ORG_LVL_NUMBER, oc.* from pmghdree oc where oc.PMG_PO_NUMBER = 117550;
+
+--108902
+--908761
+select RCV.FEC_PROC_LOG, RCV.XML_DATA_LOG, RCV.* from edsr.B2B_OC_RCV_ENVIO RCV WHERE pmg_po_number IN (108902) AND impuesto_fin = '0';
+
+SELECT WPE.VPC_TECH_KEY ProveedorID, WPE.* FROM EDSR.PMGHDREE WPE WHERE PMG_PO_NUMBER = 108902;
+-- PROVEEDOR
+SELECT WPE.VENDOR_NUMBER CodigoProveedor_TurboEntry, WPE.* FROM EDSR.VPCMSTEE WPE WHERE VPC_TECH_KEY = 14260;
+SELECT WPE.VENDOR_NUMBER CodigoProveedor_TurboEntry, WPE.* FROM EDSR.VPCMSTEE WPE WHERE VENDOR_NUMBER = 0990003769001;
+
+--ASN: Indicar al WMS algo llegara.
+/*
+    Mercaderia por OC
+    Mercaderia por Transferencia
+ */
+
+
+
+--integración WMS con PMM => recepción OC
+select * from edsr.wms_rcv_asn_hdr where hdr_group_nbr in (31594);
+select * from edsr.wms_rcv_asn_hdr where SHIPMENT_NBR = 'NAC000936234';
+select * from edsr.wms_rcv_asn_dtl where hdr_group_nbr in (31594);
+select * from edsr.wms_rcv_asn_dtl where po_nbr = '127208';
+select * from edsr.wms_error_int;
+
+
+
+--integración pmm con b2b logistico
+select RCV.FEC_PROC_LOG, RCV.* from edsr.B2B_OC_RCV_ENVIO RCV
+--UPDATE edsr.B2B_OC_RCV_ENVIO SET FEC_PROC_LOG = null
+WHERE pmg_po_number IN (164555) AND impuesto_fin = '0';
+
+SELECT * FROM EDSR.B2BACKEE2 WHERE B2B_MENSAJE LIKE '%908761%'ORDER BY 1 DESC;
+SELECT * FROM EDSR.B2BACKEE2 ORDER BY 1 DESC;
+
+-- Cambiar IVA
+-- PORCENTAJES IVA - CODIGOS SAP
+SELECT * FROM EDSR.B2B_IMPUESTO_SAP;
+-- 105353 (IVA CORRECTO 5%), 105168 (IVA CORRECTO 15%)
+SELECT * FROM PMGHDREE WHERE PMG_PO_NUMBER = 105168;
+SELECT * FROM RCVSSDEE WHERE PMG_PO_NUMBER = 105353;
+SELECT * FROM RCVTXSEE WHERE RCV_DTL_TECH_KEY IN (5375883, 5375884, 5375885, 5375886, 5375887, 5375888) AND TXS_RATE = 15;
+
+SELECT * FROM EDSR.B2B_OC_RCV_ENVIO WHERE PMG_PO_NUMBER IN (105353) AND IMPUESTO_FIN = '4';
+SELECT * FROM EDSR.B2B_OC_RCV_ENVIO WHERE PMG_PO_NUMBER IN (105168) AND IMPUESTO_FIN = '3';
+
+-- Revisar si hubo respuestas desde el B2B Financiero (ACK DEL B2B FINANCIERO)
+SELECT * FROM EDSR.B2BACKEE2 WHERE B2B_MENSAJE LIKE '748003%'; -- EL 'B2B_MENSAJE' ES EL CAMPO 'RCV_SESSION_ID' DE LA TABLA 'B2B_OC_RCV_ENVIO'
+SELECT * FROM EDSR.B2BACKEE2 WHERE B2B_MENSAJE LIKE '747966%';
+
+
+BEGIN
+    --UPDATE edsr.B2B_OC_RCV_ENVIO SET FEC_PROC_LOG = null
+    --WHERE pmg_po_number = 104533 AND impuesto_fin = '0';
+    COMMIT;
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('EXCEPTION: ' || SQLERRM) ;
+        ROLLBACK ;
+END;
+
+/*
+ 1 obtener el numero de la recepcion de la OC B2B_OC_RCV_ENVIO (RCV_SESSION_ID)
+ 2. /prochp/interfaces/b2b/export/out.log/log en esta ruta buscar el RCV_SESSION_ID, Si hay archivo signica que si lo envio
+ 3. /prochp/interfaces/b2b/import /in.log o /in BUSCAR POR  RCV_SESSION_ID  o NUM_DESPACHO  (archivos con RE_, significa respuesta) (IAP ESS no es)
+ 4. Sino hacer un update para reenviar el interfaz porque el B2B no lo ha PROCESADO (Verificar en el B2B el monto despachado debe pasar al monto ...)
+ 5. Si sigue pendiente Enviar Correo al equipo soporte BBR, con el OC, Numeero Recepcion (campo RCV_SESSION_ID) y adjuntar el xml (campo XML_DATA_LOG)que se esta enviando.
+ */
+
+
+--integración pmm con b2b financiero
+select * from edsr.B2B_OC_RCV_ENVIO where pmg_po_number = 100034 and impuesto_fin != '0';
+select * from edsr.b2backee2 where b2b_mensaje like '744849%';
+
+select * from edsr.b2backee2 where b2b_tipo_mens = 'QR' order by 1 desc;
+
+
+SELECT * FROM EDSR.WMS_MODELO_REQUEST WHERE FLAG_PROCESADO = '0' OR FLAG_ERROR = '1';
+SELECT * FROM EDSR.WMS_MODELO_REQUEST WHERE IDENTIFICADOR = 'NAC000905648';
+SELECT * FROM EDSR.WMS_MODELO_REQUEST WHERE MODELO LIKE '%NAC000905648%';
+SELECT * FROM EDSR.WMS_RCV_ASN_HDR WHERE SHIPMENT_NBR = 'NAC000905648';
+
+
+/*
+EDSR.WMS_VENDOR_ENVIO
+
+EDSR.WMS_BARCODE_ENVIO
+
+EDSR.WMS_PURCHASEORDER_ENVIO
+
+EDSR.WMS_MODELO_REQUEST
+
+EDSR.WMS_SHP_LOAD_HDR
+
+EDSR.WMS_RCV_ASN_HDR
+
+EDSR.WMS_INV_HISTORY
+
+EDSR.WMS_INV_HISTORY_LOAD
+
+EDSR.WMS_ORDER_HDR_ENVIO
+
+EDSR.WMS_CITA_ENVIO
+
+EDSR.WMS_ASN_HDR
+
+EDSR.WMS_ASN_HDR_ENVIO
+
+ */
+
+-- SE LE ENVIA AL API PARA CREAR EL ORDER
+SELECT * FROM EDSR.WMS_ORDER_HDR_ENVIO WHERE TRF_NUMBER =19923;
+
+-- REENVIO DE INTERFACE DE CREACION DE PRODUCTO (ITEM)
+SELECT * FROM EDSR.WMS_ITEM_ENVIO WMS
+-- UPDATE EDSR.WMS_ITEM_ENVIO WMS SET FEC_PROCESADO = NULL
+WHERE WMS.PRD_LVL_CHILD = '124508' AND TRAN_TYPE = 'A';
+
+
+
+SELECT PRD.PRD_LVL_NUMBER, PRD.PRD_LVL_CHILD, PRD.PRD_NAME_FULL FROM EDSR.WMS_ITEM_ENVIO WMSITEM INNER JOIN PRDMSTEE PRD ON PRD.PRD_LVL_NUMBER = PRD.PRD_LVL_NUMBER
+WHERE PRD.PRD_LVL_NUMBER = '35812';
+
+SELECT PRD_LVL_CHILD FROM TPPRDMST WHERE PRD_LVL_NUMBER = 32550;
+
+-- PMM
+SELECT TRF.TRF_QTY_REQ, TRF.* FROM TRFDTLEE TRF WHERE TRF_NUMBER = 19923 AND PRD_LVL_CHILD = '121307' ;
+SELECT TRF.TRF_QTY_REQ, TRF.* FROM TRFDTLEE TRF WHERE TRF_NUMBER = 19923 AND PRD_LVL_CHILD  IN ('102218','105065');
+SELECT PRD_LVL_NUMBER,PRD_LVL_CHILD FROM TPPRDMST WHERE PRD_LVL_NUMBER IN ('12232','15149');
+
+DECLARE
+    V_NUMBER NUMBER;
+    TF_CURSOR SYS_REFCURSOR;
+    TF_CURSOR2 SYS_REFCURSOR;
+BEGIN
+    SELECT 25 INTO V_NUMBER FROM DUAL;
+    DBMS_OUTPUT.PUT_LINE('V_NUMBER' || V_NUMBER);
+    EDSR.PKG_WMS_ORDER.SP_GET_ORDER(V_NUMBER,TF_CURSOR,TF_CURSOR2);
+END;

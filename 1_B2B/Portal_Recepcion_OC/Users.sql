@@ -1,0 +1,41 @@
+--Portal de usuarios
+SELECT * FROM EDSR.PORTAL_B2B_USUARIO;
+UPDATE PORTAL_B2B_USUARIO SET VENDOR_NUMBER = '1793039804001' WHERE ID_USUARIO = 1;
+
+
+--Agregar usuarios
+INSERT INTO EDSR.PORTAL_B2B_USUARIO (
+    CORREO,
+    NOMBRE_COMPLETO,
+    VENDOR_NUMBER,
+    PASSWORD,
+    ESTADO,
+    INTENTOS_FALLIDOS,
+    USR_CREACION
+) VALUES (
+    'admin@promart.pe',
+    'Sistemas',
+    '1000001',
+    '123456',
+    'A',
+    0,
+    'ADMIN'
+);
+
+INSERT INTO EDSR.PORTAL_B2B_USUARIO (
+    CORREO,
+    NOMBRE_COMPLETO,
+    VENDOR_NUMBER,
+    PASSWORD,
+    ESTADO,
+    INTENTOS_FALLIDOS,
+    USR_CREACION
+) VALUES (
+    'yetka@yetka.com',
+    'YETKA DEL ECUADOR CIA LTDA',
+    '1793039804001',
+    '123456',
+    'A',
+    0,
+    'ADMIN'
+);
